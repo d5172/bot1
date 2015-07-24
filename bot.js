@@ -6,13 +6,17 @@ var _ = require('lodash');
 var openNLP = require('opennlp');
 var conversations = [];
 
+var greetings = ['hi', 'hello', 'hey'];
+
 module.exports.process = function(input, person) {
   return Promise.try(function() {
-    return inConversation(person).then(function(conversation) {
-      var handler = isQuestion(input) ? handleQuestion : handleStatement;
-      return handler(input, conversation).then(function(reply) {
-        trackReply(conversation, input, reply);
-        return reply;
+    return parseInput(input).then(function(parsedInput) {
+      return inConversation(person).then(function(conversation) {
+        var handler = parsedInput.isQuestion ? handleQuestion : handleStatement;
+        return handler(parsedInput, conversation).then(function(reply) {
+          trackReply(conversation, parsedInput, reply);
+          return reply;
+        });
       });
     });
   }).catch(function(err) {
@@ -21,8 +25,8 @@ module.exports.process = function(input, person) {
   });
 };
 
-function trackReply(conversation, input, reply) {
-  conversation.inputs.push(input);
+function trackReply(conversation, parsedInput, reply) {
+  conversation.inputs.push(parsedInput.originalInput);
   conversation.replies.push(reply);
 }
 
@@ -44,33 +48,40 @@ function inConversation(person) {
   return Promise.resolve(conversation);
 }
 
-function isQuestion(input) {
-  return _.endsWith(input.trim(), '?');
-}
-
-var handleQuestion = function(input, conversation) {
-  var cleanedInput = input.trim().toLowerCase();
-  if (_.startsWith(cleanedInput, 'what')) {
-    return whatIs(cleanedInput);
-  } else if (_.startsWith(cleanedInput, 'who')) {
-    return whatIs(cleanedInput);
-  } else if (_.startsWith(cleanedInput, 'why')) {
-    return whatIs(cleanedInput);
-  } else if (_.startsWith(cleanedInput, 'when')) {
-    return whatIs(cleanedInput);
-  } else if (_.startsWith(cleanedInput, 'where')) {
-    return whatIs(cleanedInput);
-  } else if (_.startsWith(cleanedInput, 'how')) {
-    return whatIs(cleanedInput);
+var handleQuestion = function(parsedInput, conversation) {
+  if (_.startsWith(parsedInput.cleanedInput, 'what')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'who')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'why')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'when')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'where')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'how')) {
+    return whatIs(parsedInput);
+  } else if (_.startsWith(parsedInput, 'do you')) {
+    return doYou(parsedInput);
   } else {
-    return whatIs(cleanedInput);
+    return whatIs(parsedInput);
   }
-}
+};
 
-var handleStatement = function(input, conversation) {
+var handleStatement = function(parsedInput, conversation) {
   return new Promise(function(resolve, reject) {
+    var firstName = conversation.person.split('.')[0];
+
+    if (parsedInput.tokens.length > 0 && _.contains(greetings, parsedInput.tokens[0].toLowerCase())) {
+      return resolve(parsedInput.tokens[0] + ', ' + firstName + '!');
+    }
+
+    if (parsedInput.tags.length > 0 && parsedInput.tags[0] === 'UH') {
+      return resolve(parsedInput.tokens[0] + '!');
+    }
+
     if (conversation.inputs.length === 0) {
-      var firstName = person.split('.')[0];
+
       return resolve('Thanks, ' + firstName);
     } else if (conversation.inputs.length > 20) {
       return resolve('cool');
@@ -78,10 +89,10 @@ var handleStatement = function(input, conversation) {
       return resolve('ok');
     }
   });
-}
+};
 
-function whatIs(input) {
-  return extractSubject(input).then(function(subject) {
+function whatIs(parsedInput) {
+  return extractSubject(parsedInput).then(function(subject) {
     log.debug('what is', subject);
     if (!subject) {
       return "huh?";
@@ -100,42 +111,58 @@ function whatIs(input) {
   });
 }
 
-function extractSubject(sentence) {
+function doYou(parsedInput) {
+  return Promise.resolve('do you?');
+}
+
+function parseInput(input) {
   return new Promise(function(resolve, reject) {
+    var parsed = {
+      originalInput: input,
+      cleanedInput: input.trim().toLowerCase()
+    };
     var posTagger = new openNLP().posTagger;
 
     var tokenizer = new openNLP().tokenizer;
-    tokenizer.tokenize(sentence, function(err, tokens) {
+    tokenizer.tokenize(input, function(err, tokens) {
       if (err) {
         return reject(err);
       }
       log.debug('tokenize', tokens);
-
-      posTagger.tag(sentence, function(err, tags) {
+      parsed.tokens = tokens;
+      posTagger.tag(input, function(err, tags) {
         if (err) {
           return reject(err);
         }
-        log.debug('tagged %s', sentence, tags);
+        log.debug('tagged %s', input, tags);
+        parsed.tags = tags;
 
-        var firstNounIndex = _.indexOf(tags, 'NN');
-        if (firstNounIndex === -1) {
-          firstNounIndex = _.indexOf(tags, 'NP');
-        }
-        if (firstNounIndex === -1) {
-          firstNounIndex = _.indexOf(tags, 'RB');
-        }
-        if (firstNounIndex === -1) {
-          firstNounIndex = tags.length - 1;
-        }
-        if (firstNounIndex !== -1) {
-          log.debug('firstNounIndex', firstNounIndex);
-          var firstNoun = tokens[firstNounIndex];
-          return resolve(firstNoun);
-        }
-        return resolve('');
+        parsed.isQuestion = _.endsWith(input.trim(), '?'); //TODO - check first tag for wh* 
+
+        return resolve(parsed);
       });
     });
   });
+}
 
+function extractSubject(parsedInput) {
+  return new Promise(function(resolve, reject) {
 
+    var firstNounIndex = _.indexOf(parsedInput.tags, 'NN');
+    if (firstNounIndex === -1) {
+      firstNounIndex = _.indexOf(parsedInput.tags, 'NP');
+    }
+    if (firstNounIndex === -1) {
+      firstNounIndex = _.indexOf(parsedInput.tags, 'RB');
+    }
+    if (firstNounIndex === -1) {
+      firstNounIndex = parsedInput.tags.length - 1;
+    }
+    if (firstNounIndex !== -1) {
+      log.debug('firstNounIndex', firstNounIndex);
+      var firstNoun = parsedInput.tokens[firstNounIndex];
+      return resolve(firstNoun);
+    }
+    return resolve('');
+  });
 }
