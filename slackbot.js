@@ -1,6 +1,6 @@
 'use strict';
 
-var bot = require('./bot');
+var Bot = require('./bot');
 var Slack = require('slack-client');
 var log = require('./log').getLogger('slackbot');
 
@@ -9,6 +9,7 @@ var autoReconnect = true;
 var autoMark = true;
 
 var slack = new Slack(TOKEN, autoReconnect, autoMark);
+var bot = new Bot();
 
 function isDirectMessageChannel(channelName) {
   return channelName.indexOf('#') === -1;
@@ -19,7 +20,7 @@ function isAtMe(text) {
 }
 
 function atMeString() {
-  return '<@' + slack.self.id + '>:';
+  return '<@' + slack.self.id + '>';
 }
 
 slack.on('open', function() {
@@ -82,7 +83,7 @@ slack.on('message', function(message) {
       var input = text.replace(atMeString(), '').trim();
       log.debug('input', input);
       var person = userName.replace('@', '');
-      return bot.process(input, person).then(function(response) {
+      return bot.process(input, person, channelName).then(function(response) {
         log.debug('output', response);
         if (response) {
           channel.send(response);
@@ -107,6 +108,18 @@ slack.on('message', function(message) {
 slack.on('error', function(error) {
   log.error(error);
   return console.error('Error: ' + error);
+});
+
+bot.on('message', function(message) {
+  var channel = slack.getChannelByName(message.channel);
+  if (!channel) {
+    channel = slack.getDMByName(message.channel);
+  }
+  if (channel) {
+    channel.send(message.text);
+    log.debug('@' + slack.self.name + ' said \'' + message.text + '\'');
+  }
+
 });
 
 slack.login();

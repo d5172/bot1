@@ -1,20 +1,36 @@
 'use strict';
-var wikidata = require('./wikidata');
+
 var Promise = require('bluebird');
+var util = require('util');
+var EventEmitter = require('events').EventEmitter;
 var log = require('./log').getLogger('bot');
 var _ = require('lodash');
 var openNLP = require('opennlp');
-var conversations = [];
+var wikidata = require('./wikidata');
 
 var greetings = ['hi', 'hello', 'hey'];
 
-module.exports.process = function(input, person) {
+var RESUME_MS = 30000;
+
+module.exports = Bot;
+
+function Bot() {
+  this.conversations = [];
+  this.timers = [];
+}
+
+util.inherits(Bot, EventEmitter);
+
+Bot.prototype.process = function(input, person, channel) {
+  var self = this;
   return Promise.try(function() {
-    return parseInput(input).then(function(parsedInput) {
-      return inConversation(person).then(function(conversation) {
+    return inConversation(person, channel).then(function(conversation) {
+     // pauseConversation(conversation);
+      return parseInput(input).then(function(parsedInput) {
         var handler = parsedInput.isQuestion ? handleQuestion : handleStatement;
         return handler(parsedInput, conversation).then(function(reply) {
           trackReply(conversation, parsedInput, reply);
+        //  resumeConversation(conversation);
           return reply;
         });
       });
@@ -23,30 +39,74 @@ module.exports.process = function(input, person) {
     log.error('processing "' + input + '"', err);
     return 'That does not compute.';
   });
+
+  function inConversation(person) {
+    if (!person) {
+      person = 'anonymous';
+    }
+    if (!channel) {
+      channel = 'general';
+    }
+    var conversation = _.find(self.conversations, {
+      person: person,
+      channel: channel
+    });
+    if (!conversation) {
+      conversation = {
+        person: person,
+        channel: channel,
+        inputs: [],
+        replies: []
+      };
+      self.conversations.push(conversation);
+      log.debug('created new conversation with %s on %s', person, channel);
+    }
+    log.debug('in conversation with %s on %s', person, channel);
+    return Promise.resolve(conversation);
+  }
+
+  function resumeConversation(conversation) {
+
+    var timeout = setTimeout(function(conversation) {
+      log.debug('resuming conversation with %s on %s', conversation.person, conversation.channel);
+      getResumeConversationText(conversation).then(function(text) {
+        self.emit('message', {
+          person: conversation.person,
+          channel: conversation.channel,
+          text: text
+        });
+        pauseConversation(conversation);
+      });
+    }, RESUME_MS, conversation);
+
+    self.timers.push({
+      person: conversation.person,
+      channel: conversation.channel,
+      timout: timeout
+    });
+
+  }
+
+  function pauseConversation(conversation) {
+    var timer = _.find(self.timers, {
+      person: conversation.person,
+      channel: conversation.channel
+    });
+    if (timer) {
+      clearTimeout(timer.timeout);
+    }
+  }
 };
+
+function getResumeConversationText(conversation) {
+  return Promise.resolve('Let me know if you need anything else!');
+}
 
 function trackReply(conversation, parsedInput, reply) {
   conversation.inputs.push(parsedInput.originalInput);
   conversation.replies.push(reply);
 }
 
-function inConversation(person) {
-  if (!person) {
-    person = 'anonymous';
-  }
-  var conversation = conversations[person];
-  if (!conversation) {
-    conversation = {
-      person: person,
-      inputs: [],
-      replies: []
-    };
-    conversations.push(conversation);
-    log.debug('created new conversation with', person);
-  }
-  log.debug('in conversation with', person);
-  return Promise.resolve(conversation);
-}
 
 var handleQuestion = function(parsedInput, conversation) {
   if (_.startsWith(parsedInput.cleanedInput, 'what')) {
