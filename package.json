@@ -1,19 +1,21 @@
 {
   "name": "bot1",
   "version": "0.0.1",
-  "description": "Chat bot using wiki data",
+  "description": "The humble beginnings of a chat bot",
   "main": "index.js",
+  "repository": "https://github.com/d5172/bot1",
   "scripts": {
     "test": "npm test"
   },
   "author": "David Martines",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "request": "~2.58.0",
     "bluebird": "~2.9.30",
-    "log4js": "~0.6.26",
-    "slack-client": "~1.4.1",
     "lodash": "~3.10.0",
-    "opennlp": "~1.1.0"
+    "log4js": "~0.6.26",
+    "mongodb": "^2.0.39",
+    "opennlp": "~1.1.0",
+    "request": "~2.58.0",
+    "slack-client": "~1.4.1"
   }
 }

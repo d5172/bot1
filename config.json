@@ -1,5 +1,8 @@
 {
   "slack": {
     "apiToken": "xoxb-8162043616-d410aGNIbkrt2iDYPUotOXxu"
+  },
+  "mongodb": {
+    "uri": "mongodb://localhost:27017/bot1"
   }
 }

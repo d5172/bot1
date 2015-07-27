@@ -7,6 +7,7 @@ var log = require('./log').getLogger('bot');
 var _ = require('lodash');
 var openNLP = require('opennlp');
 var wikidata = require('./wikidata');
+var conversations = require('./conversations');
 
 var greetings = ['hi', 'hello', 'hey'];
 
@@ -15,7 +16,7 @@ var RESUME_MS = 30000;
 module.exports = Bot;
 
 function Bot() {
-  this.conversations = [];
+  conversations.init();
   this.timers = [];
 }
 
@@ -24,13 +25,13 @@ util.inherits(Bot, EventEmitter);
 Bot.prototype.process = function(input, context) {
   var self = this;
   return Promise.try(function() {
-    return inConversation(context).then(function(conversation) {
+    return conversations.establish(context).then(function(conversation) {
       pauseConversation(conversation);
       return parseInput(input).then(function(parsedInput) {
         var handler = parsedInput.isQuestion ? handleQuestion : handleStatement;
         return handler(parsedInput, conversation).then(function(reply) {
-          trackReply(conversation, parsedInput, reply);
-          resumeConversation(conversation);
+          trackConversation(conversation, parsedInput, reply);
+          continueConversation(conversation);
           return reply;
         });
       });
@@ -40,53 +41,63 @@ Bot.prototype.process = function(input, context) {
     return 'That does not compute.';
   });
 
-  function inConversation(context) {
-    if (!context) {
-      context = 'anonymous';
-    }
-    var conversation = _.find(self.conversations, {
-      context: context
-    });
-    if (!conversation) {
-      conversation = {
-        context: context,
-        inputs: [],
-        replies: []
-      };
-      self.conversations.push(conversation);
-      log.debug('created new conversation in %s', context);
-    }
-    log.debug('in conversation in %s', context);
-    return Promise.resolve(conversation);
-  }
+  // function inConversation(context) {
+  //   if (!context) {
+  //     context = 'anonymous';
+  //   }
+  //   return conversations.findByContext(context).then(function(conversation) {
+  //     if (!conversation) {
+  //       conversation = {
+  //         context: context,
+  //         inputs: [],
+  //         replies: []
+  //       };
+  //       return conversations.add(conversation).then(function() {
+  //         log.debug('created new conversation in %s', context);
+  //         return conversation;
+  //       });
+  //     } else {
+  //       log.debug('in conversation in %s', context);
+  //       return conversation;
+  //     }
+  //   });
+  // }
 
-  function resumeConversation(conversation) {
-
-    var timeout = setTimeout(function(conversation) {
-      log.debug('resuming conversation in %s', conversation.context);
+  function continueConversation(conversation) {
+    if (_.find(self.timers, {
+        context: conversation.context
+      })) {
+      return;
+    }
+    var t = setTimeout(function(conversation) {
+      log.debug('continuing conversation in %s', conversation.context);
       getResumeConversationText(conversation).then(function(text) {
         self.emit('message', {
           context: conversation.context,
           text: text
         });
         pauseConversation(conversation);
+        trackConversation(conversation, null, text);
       });
     }, RESUME_MS, conversation);
 
     self.timers.push({
       context: conversation.context,
-      timout: timeout
+      id: t
     });
 
   }
 
   function pauseConversation(conversation) {
-    var timer = _.find(self.timers, {
+    log.debug('pausing conversation in %s', conversation.context);
+    _.filter(self.timers, {
       context: conversation.context,
+    }).forEach(function(timer) {
+      clearTimeout(timer.id);
+      _.remove(self.timers, function(t) {
+        return t.context === conversation.context;
+      });
     });
-    if (timer) {
-      clearTimeout(timer.timeout);
-    }
   }
 };
 
@@ -94,11 +105,13 @@ function getResumeConversationText(conversation) {
   return Promise.resolve('yo');
 }
 
-function trackReply(conversation, parsedInput, reply) {
-  conversation.inputs.push(parsedInput.originalInput);
-  conversation.replies.push(reply);
+function trackConversation(conversation, parsedInput, reply) {
+  var inputToTrack = null;
+  if (parsedInput) {
+    inputToTrack = parsedInput.originalInput;
+  }
+  conversations.track(conversation, inputToTrack, reply);
 }
-
 
 var handleQuestion = function(parsedInput, conversation) {
   if (_.startsWith(parsedInput.cleanedInput, 'what')) {
