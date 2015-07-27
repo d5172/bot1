@@ -3,12 +3,12 @@
 var Bot = require('./bot');
 var Slack = require('slack-client');
 var log = require('./log').getLogger('slackbot');
+var config = require('./config.json');
 
-var TOKEN = 'xoxb-8162043616-d410aGNIbkrt2iDYPUotOXxu';
 var autoReconnect = true;
 var autoMark = true;
 
-var slack = new Slack(TOKEN, autoReconnect, autoMark);
+var slack = new Slack(config.slack.apiToken, autoReconnect, autoMark);
 var bot = new Bot();
 
 function isDirectMessageChannel(channelName) {
