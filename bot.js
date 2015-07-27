@@ -26,12 +26,12 @@ Bot.prototype.process = function(input, context) {
   var self = this;
   return Promise.try(function() {
     return conversations.establish(context).then(function(conversation) {
-      pauseConversation(conversation);
+      stopThinking(conversation);
       return parseInput(input).then(function(parsedInput) {
         var handler = parsedInput.isQuestion ? handleQuestion : handleStatement;
         return handler(parsedInput, conversation).then(function(reply) {
           trackConversation(conversation, parsedInput, reply);
-          continueConversation(conversation);
+          startThinking(conversation);
           return reply;
         });
       });
@@ -41,42 +41,21 @@ Bot.prototype.process = function(input, context) {
     return 'That does not compute.';
   });
 
-  // function inConversation(context) {
-  //   if (!context) {
-  //     context = 'anonymous';
-  //   }
-  //   return conversations.findByContext(context).then(function(conversation) {
-  //     if (!conversation) {
-  //       conversation = {
-  //         context: context,
-  //         inputs: [],
-  //         replies: []
-  //       };
-  //       return conversations.add(conversation).then(function() {
-  //         log.debug('created new conversation in %s', context);
-  //         return conversation;
-  //       });
-  //     } else {
-  //       log.debug('in conversation in %s', context);
-  //       return conversation;
-  //     }
-  //   });
-  // }
-
-  function continueConversation(conversation) {
+  function startThinking(conversation) {
     if (_.find(self.timers, {
         context: conversation.context
       })) {
       return;
     }
+    log.debug('start thinking in %s', conversation.context);
     var t = setTimeout(function(conversation) {
       log.debug('continuing conversation in %s', conversation.context);
-      getResumeConversationText(conversation).then(function(text) {
+      getContinueConversationText(conversation).then(function(text) {
         self.emit('message', {
           context: conversation.context,
           text: text
         });
-        pauseConversation(conversation);
+        stopThinking(conversation);
         trackConversation(conversation, null, text);
       });
     }, RESUME_MS, conversation);
@@ -88,8 +67,8 @@ Bot.prototype.process = function(input, context) {
 
   }
 
-  function pauseConversation(conversation) {
-    log.debug('pausing conversation in %s', conversation.context);
+  function stopThinking(conversation) {
+    log.debug('stop thinking in %s', conversation.context);
     _.filter(self.timers, {
       context: conversation.context,
     }).forEach(function(timer) {
@@ -101,7 +80,7 @@ Bot.prototype.process = function(input, context) {
   }
 };
 
-function getResumeConversationText(conversation) {
+function getContinueConversationText(conversation) {
   return Promise.resolve('yo');
 }
 

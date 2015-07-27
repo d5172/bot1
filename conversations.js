@@ -52,16 +52,6 @@ exports.establish = function(context) {
   });
 };
 
-exports.add = function(conversation) {
-  return db.connect().then(function(conn) {
-    var collection = conn.collection('conversations');
-    return collection.insertOne(conversation).then(function() {
-      conn.close();
-      convHash.context = conversation;
-    });
-  });
-};
-
 exports.track = function(conversation, input, reply) {
   log.debug('tracking', conversation.context);
   conversation.inputs.push(input);
