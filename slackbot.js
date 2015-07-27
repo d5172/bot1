@@ -82,8 +82,7 @@ slack.on('message', function(message) {
 
       var input = text.replace(atMeString(), '').trim();
       log.debug('input', input);
-      var person = userName.replace('@', '');
-      return bot.process(input, person, channelName).then(function(response) {
+      return bot.process(input, channelName).then(function(response) {
         log.debug('output', response);
         if (response) {
           channel.send(response);
@@ -111,9 +110,9 @@ slack.on('error', function(error) {
 });
 
 bot.on('message', function(message) {
-  var channel = slack.getChannelByName(message.channel);
+  var channel = slack.getChannelByName(message.context);
   if (!channel) {
-    channel = slack.getDMByName(message.channel);
+    channel = slack.getDMByName(message.context);
   }
   if (channel) {
     channel.send(message.text);

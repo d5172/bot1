@@ -21,16 +21,16 @@ function Bot() {
 
 util.inherits(Bot, EventEmitter);
 
-Bot.prototype.process = function(input, person, channel) {
+Bot.prototype.process = function(input, context) {
   var self = this;
   return Promise.try(function() {
-    return inConversation(person, channel).then(function(conversation) {
-     // pauseConversation(conversation);
+    return inConversation(context).then(function(conversation) {
+      pauseConversation(conversation);
       return parseInput(input).then(function(parsedInput) {
         var handler = parsedInput.isQuestion ? handleQuestion : handleStatement;
         return handler(parsedInput, conversation).then(function(reply) {
           trackReply(conversation, parsedInput, reply);
-        //  resumeConversation(conversation);
+          resumeConversation(conversation);
           return reply;
         });
       });
@@ -40,39 +40,33 @@ Bot.prototype.process = function(input, person, channel) {
     return 'That does not compute.';
   });
 
-  function inConversation(person) {
-    if (!person) {
-      person = 'anonymous';
-    }
-    if (!channel) {
-      channel = 'general';
+  function inConversation(context) {
+    if (!context) {
+      context = 'anonymous';
     }
     var conversation = _.find(self.conversations, {
-      person: person,
-      channel: channel
+      context: context
     });
     if (!conversation) {
       conversation = {
-        person: person,
-        channel: channel,
+        context: context,
         inputs: [],
         replies: []
       };
       self.conversations.push(conversation);
-      log.debug('created new conversation with %s on %s', person, channel);
+      log.debug('created new conversation in %s', context);
     }
-    log.debug('in conversation with %s on %s', person, channel);
+    log.debug('in conversation in %s', context);
     return Promise.resolve(conversation);
   }
 
   function resumeConversation(conversation) {
 
     var timeout = setTimeout(function(conversation) {
-      log.debug('resuming conversation with %s on %s', conversation.person, conversation.channel);
+      log.debug('resuming conversation in %s', conversation.context);
       getResumeConversationText(conversation).then(function(text) {
         self.emit('message', {
-          person: conversation.person,
-          channel: conversation.channel,
+          context: conversation.context,
           text: text
         });
         pauseConversation(conversation);
@@ -80,8 +74,7 @@ Bot.prototype.process = function(input, person, channel) {
     }, RESUME_MS, conversation);
 
     self.timers.push({
-      person: conversation.person,
-      channel: conversation.channel,
+      context: conversation.context,
       timout: timeout
     });
 
@@ -89,8 +82,7 @@ Bot.prototype.process = function(input, person, channel) {
 
   function pauseConversation(conversation) {
     var timer = _.find(self.timers, {
-      person: conversation.person,
-      channel: conversation.channel
+      context: conversation.context,
     });
     if (timer) {
       clearTimeout(timer.timeout);
@@ -99,7 +91,7 @@ Bot.prototype.process = function(input, person, channel) {
 };
 
 function getResumeConversationText(conversation) {
-  return Promise.resolve('Let me know if you need anything else!');
+  return Promise.resolve('yo');
 }
 
 function trackReply(conversation, parsedInput, reply) {
@@ -130,10 +122,9 @@ var handleQuestion = function(parsedInput, conversation) {
 
 var handleStatement = function(parsedInput, conversation) {
   return new Promise(function(resolve, reject) {
-    var firstName = conversation.person.split('.')[0];
 
     if (parsedInput.tokens.length > 0 && _.contains(greetings, parsedInput.tokens[0].toLowerCase())) {
-      return resolve(parsedInput.tokens[0] + ', ' + firstName + '!');
+      return resolve(parsedInput.tokens[0] + '!');
     }
 
     if (parsedInput.tags.length > 0 && parsedInput.tags[0] === 'UH') {
@@ -141,8 +132,7 @@ var handleStatement = function(parsedInput, conversation) {
     }
 
     if (conversation.inputs.length === 0) {
-
-      return resolve('Thanks, ' + firstName);
+      return resolve('Thanks');
     } else if (conversation.inputs.length > 20) {
       return resolve('cool');
     } else {
