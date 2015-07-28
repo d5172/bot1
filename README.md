@@ -9,6 +9,7 @@ The humble beginnings of a chat bot.
 ### Basic book-smarts
 * Handle wh* questions with an appropriate response.
 * Look up facts from wikidata / wikipedia as needed to appear somewhat knowledgable about the world.
+* Use wolfram alpha api
 
 ### Learn
 * Ask a question, get a reply, and if asked later be able to recall the answer.

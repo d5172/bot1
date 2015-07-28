@@ -5,6 +5,8 @@ var minimist = require('minimist');
 
 var args = minimist(process.argv);
 
+var level = args.loglevel || 'DEBUG';
+
 if (args.nolog) {
   log4js.clearAppenders();
 } else {
@@ -18,4 +20,8 @@ if (args.nolog) {
   });
 }
 
-module.exports = log4js;
+module.exports.getLogger = function(name) {
+  var logger = log4js.getLogger(name);
+  logger.setLevel(level);
+  return logger;
+};
