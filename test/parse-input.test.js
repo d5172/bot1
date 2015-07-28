@@ -1,13 +1,13 @@
 'use strict';
 
 var chai = require('chai');
-chai.use(require('chai-as-promised'));
+//chai.use(require('chai-as-promised'));
 //chai.use(require('sinon-chai'));
 var expect = chai.expect;
 
 var parseInput = require('../parse-input');
 
-var statement1 = 'The quick brown fox jumps over the lazy dog.';
+var statement1 = ' The quick brown fox jumps over the lazy dog. ';
 
 var questions = [
   'What is your name?',
@@ -21,7 +21,8 @@ var questions = [
 
 describe('parse-input', function() {
 
-  describe.only('given questions', function() {
+  describe('given questions', function() {
+
     questions.forEach(function(q) {
       it('recognizes ' + q, function(done) {
         parseInput(q).then(function(parsed) {
@@ -76,9 +77,13 @@ describe('parse-input', function() {
       }).finally(done);
     });
 
+    it('gets cleaned input', function(done) {
+      parseInput(statement1).then(function(parsed) {
+        expect(parsed.cleanedInput).to.eql('the quick brown fox jumps over the lazy dog.');
+      }).finally(done);
+    });
+
   });
-
-
 
   describe('given an empty string', function() {
     it('returns an object', function(done) {
@@ -93,20 +98,17 @@ describe('parse-input', function() {
       }).finally(done);
     });
 
-
     it('returns an object with an empty array of tokens', function(done) {
       parseInput('').then(function(parsed) {
         expect(parsed.tokens).to.eql([]);
       }).finally(done);
     });
 
-
-    it('returns an object with an empty array of tags', function(done) {
+    it('returns an object with an NN tag', function(done) {
       parseInput('').then(function(parsed) {
         expect(parsed.tags).to.eql(['NN']);
       }).finally(done);
     });
   });
-
 
 });

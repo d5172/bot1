@@ -11,15 +11,15 @@ module.exports = function(input) {
       cleanedInput: input.trim().toLowerCase()
     };
     var posTagger = new openNLP().posTagger;
-
     var tokenizer = new openNLP().tokenizer;
-    tokenizer.tokenize(input, function(err, tokens) {
+    var trimmed = input.trim();
+    tokenizer.tokenize(trimmed, function(err, tokens) {
       if (err) {
         return reject(err);
       }
       log.debug('tokenize', tokens);
       parsed.tokens = tokens;
-      posTagger.tag(input, function(err, tags) {
+      posTagger.tag(trimmed, function(err, tags) {
         if (err) {
           return reject(err);
         }
@@ -27,7 +27,7 @@ module.exports = function(input) {
         parsed.tags = tags;
 
         if (tags.length > 0) {
-          parsed.isQuestion = _.startsWith(tags[0], 'W') || _.endsWith(input.trim(), '?');
+          parsed.isQuestion = _.startsWith(tags[0], 'W') || _.endsWith(trimmed, '?');
         }
 
         return resolve(parsed);
