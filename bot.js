@@ -4,14 +4,14 @@ var Promise = require('bluebird');
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
 var log = require('./log').getLogger('bot');
+var parseInput = require('./parse-input');
 var _ = require('lodash');
-var openNLP = require('opennlp');
 var wikidata = require('./wikidata');
 var conversations = require('./conversations');
 
 var greetings = ['hi', 'hello', 'hey'];
 
-var RESUME_MS = 30000;
+var RESUME_MS = 60000;
 
 module.exports = Bot;
 
@@ -155,36 +155,6 @@ function whatIs(parsedInput) {
 
 function doYou(parsedInput) {
   return Promise.resolve('do you?');
-}
-
-function parseInput(input) {
-  return new Promise(function(resolve, reject) {
-    var parsed = {
-      originalInput: input,
-      cleanedInput: input.trim().toLowerCase()
-    };
-    var posTagger = new openNLP().posTagger;
-
-    var tokenizer = new openNLP().tokenizer;
-    tokenizer.tokenize(input, function(err, tokens) {
-      if (err) {
-        return reject(err);
-      }
-      log.debug('tokenize', tokens);
-      parsed.tokens = tokens;
-      posTagger.tag(input, function(err, tags) {
-        if (err) {
-          return reject(err);
-        }
-        log.debug('tagged %s', input, tags);
-        parsed.tags = tags;
-
-        parsed.isQuestion = _.endsWith(input.trim(), '?'); //TODO - check first tag for wh* 
-
-        return resolve(parsed);
-      });
-    });
-  });
 }
 
 function extractSubject(parsedInput) {
