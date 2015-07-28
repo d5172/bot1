@@ -8,6 +8,7 @@ var parseInput = require('./parse-input');
 var _ = require('lodash');
 var wikidata = require('./wikidata');
 var conversations = require('./conversations');
+var pos = require('./pos');
 
 var greetings = ['hi', 'hello', 'hey'];
 
@@ -119,7 +120,7 @@ var handleStatement = function(parsedInput, conversation) {
       return resolve(parsedInput.tokens[0] + '!');
     }
 
-    if (parsedInput.tags.length > 0 && parsedInput.tags[0] === 'UH') {
+    if (parsedInput.tags.length > 0 && parsedInput.tags[0] === pos.interjection) {
       return resolve(parsedInput.tokens[0] + '!');
     }
 
@@ -160,12 +161,18 @@ function doYou(parsedInput) {
 function extractSubject(parsedInput) {
   return new Promise(function(resolve, reject) {
 
-    var firstNounIndex = _.indexOf(parsedInput.tags, 'NN');
+    var firstNounIndex = _.indexOf(parsedInput.tags, pos.noun_singular_or_mass);
     if (firstNounIndex === -1) {
-      firstNounIndex = _.indexOf(parsedInput.tags, 'NP');
+      firstNounIndex = _.indexOf(parsedInput.tags, pos.noun_plural);
     }
     if (firstNounIndex === -1) {
-      firstNounIndex = _.indexOf(parsedInput.tags, 'RB');
+      firstNounIndex = _.indexOf(parsedInput.tags, pos.proper_noun_singular);
+    }
+    if (firstNounIndex === -1) {
+      firstNounIndex = _.indexOf(parsedInput.tags, pos.proper_noun_plural);
+    }
+    if (firstNounIndex === -1) {
+      firstNounIndex = _.indexOf(parsedInput.tags, pos.adverb);
     }
     if (firstNounIndex === -1) {
       firstNounIndex = parsedInput.tags.length - 1;
